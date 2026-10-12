@@ -1,0 +1,12 @@
+{
+  "name": "memento",
+  "owner": { "name": "ArchiRand" },
+  "description": "memento: long-term project memory for Claude Code",
+  "plugins": [
+    {
+      "name": "memento",
+      "source": "./plugin",
+      "description": "Project memory in markdown files under a local git repo, loaded automatically at session start"
+    }
+  ]
+}

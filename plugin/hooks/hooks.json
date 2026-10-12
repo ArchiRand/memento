@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "java",
+            "args": ["-jar", "${CLAUDE_PLUGIN_ROOT}/memento.jar", "prime"],
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

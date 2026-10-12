@@ -1,0 +1,8 @@
+{
+  "name": "memento",
+  "version": "0.1.0",
+  "description": "Long-term project memory for Claude Code: markdown documents in a local git repo (~/.memento), MCP tools to read and edit them, and a SessionStart hook that loads the core documents automatically.",
+  "author": { "name": "ArchiRand" },
+  "repository": "https://github.com/ArchiRand/memento",
+  "keywords": ["memory", "context", "mcp"]
+}
