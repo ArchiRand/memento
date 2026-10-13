@@ -77,7 +77,7 @@ def git(directory, *args):
     return subprocess.run(["git", "-C", str(directory), *args], check=True, capture_output=True, text=True).stdout.strip()
 def main():
     if not JAR.exists():
-        sys.exit(f"{JAR} not found: run mvn package in server/ first")
+        sys.exit(f"{JAR} not found: run mvn package in server/ and move server/target/memento.jar there")
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="memento-trace-")).resolve()
     vault, project = tmp / "vault", tmp / "trace-project"
     project.mkdir()

@@ -41,6 +41,9 @@ Work as usual: Claude reads and writes memory on its own. You can also ask direc
 ## Build
 
 ```
-cd server && mvn package   # tests + plugin/memento.jar
+cd server && mvn package   # tests + server/target/memento.jar
+cd .. && mv server/target/memento.jar plugin/memento.jar
 python3 -I scripts/trace_mcp.py   # end-to-end trace of the MCP server before a release
 ```
+
+Install the jar with `mv`, not by building or copying over it: open Claude Code sessions keep running the old jar, and a rename leaves their file intact while an in-place overwrite breaks them. On Windows the move fails while sessions are open; close them first. New sessions pick up the new jar; `/mcp` reconnects the current one.
