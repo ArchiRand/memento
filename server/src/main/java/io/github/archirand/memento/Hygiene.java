@@ -31,7 +31,8 @@ final class Hygiene
         int core = coreChars(docs);
         if (core > CORE_BUDGET)
         {
-            warnings.add("core documents take " + core + " chars, budget is " + CORE_BUDGET + ": move stable sections into non-core documents");
+            warnings.add("core documents take " + core + " chars, budget is " + CORE_BUDGET
+                         + ": the hook lists the rest under Not loaded and they are read with one more call; do not trim documents just to fit");
         }
         docs.stream()
             .filter(doc -> doc.name().equals("activeTask.md"))

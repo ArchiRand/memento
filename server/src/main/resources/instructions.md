@@ -19,7 +19,7 @@ Do not store what the repository already records (code structure, git history) o
 - Pass expectedRevision from your last read. On "revision mismatch" re-read the document, merge your change into the current text and retry; never blindly overwrite.
 - Link related documents with [[name]] (without .md), for example "details in [[moneyBoxToolMigration]]".
 - Tags: at least 2, lowercase English, consistent across documents (`database`, not `db`).
-- core: true only for context.md (goal, stack, constraints) and activeTask.md. Keep core small: the hook loads at most 9 000 characters of core documents, a core document that does not fit costs an extra read at session start. When a tool reports the core budget warning, move stable sections (environment pitfalls, measurements, finished work) into non-core documents and link them.
+- core: true only for context.md (goal, stack, constraints) and activeTask.md. The hook loads at most 9 000 characters of core documents; one that does not fit is listed under "Not loaded" and costs one extra read at session start. That is cheap: do not trim or split documents just to fit the budget. Keep core about the current state by moving finished work into activeTaskArchive.md as described below.
 
 ## Recommended documents
 - context.md (core): project goal, stack, constraints and agreements.
