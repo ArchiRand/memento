@@ -142,19 +142,39 @@ def main():
     check(error and "invalid document name" in message, "path traversal in a document name is rejected")
     error, message = first.call("write_document", {"name": "x.md", "content": "x", "tags": ["single"]})
     check(error and "at least 2 tags" in message, "fewer than 2 tags is rejected")
+    error, message = first.call("write_document", {"name": "x.md", "content": "x", "tags": ["single", None]})
+    check(error and "at least 2 tags" in message, "a null tag does not count as a tag")
+
+    error, read = first.call("read_documents", {"names": "[\"context.md\"]"})
+    check(not error and [doc["name"] for doc in read["documents"]] == ["context.md"], "an array sent JSON-encoded as a string is decoded")
+    error, read = first.call("read_documents", {"names": "context.md"})
+    check(not error and [doc["name"] for doc in read["documents"]] == ["context.md"], "a lone string is a one-element array")
+    error, message = first.call("read_documents", {"names": []})
+    check(error and "non-empty" in message, "empty names is an error, not an empty success")
+    error, edited = first.call("edit_document", {"name": "context.md",
+                                                 "edits": json.dumps([{"oldText": "line two", "newText": "line two, again"}])})
+    check(not error, "edits sent JSON-encoded as a string are applied")
+
+    error, written = first.call("write_document", {"project": "other-notes", "name": "notes.md", "content": "x", "tags": ["a", "b"]})
+    check(not error and any("created new project 'other-notes'" in w and "trace-project" in w for w in written["warnings"]),
+          "a write to an unknown explicit project creates it and warns with the known keys")
+    error, written = first.call("write_document", {"project": "other-notes", "name": "notes.md", "content": "y", "tags": ["a", "b"]})
+    check(not error and not any("created new project" in w for w in written["warnings"]), "the warning is given only once")
     first.close()
 
     print("\n--- vault state ---")
     log = git(vault, "log", "--format=%s")
     print(log)
-    check(log.splitlines() == ["delete trace-project/progress.md", "append trace-project/progress.md",
+    check(log.splitlines() == ["write other-notes/notes.md", "write other-notes/notes.md", "edit trace-project/context.md",
+                               "delete trace-project/progress.md", "append trace-project/progress.md",
                                "append trace-project/progress.md", "edit trace-project/context.md",
                                "write trace-project/context.md", "init memento vault"],
           "every successful mutation is exactly one commit; rejected calls commit nothing")
     registry = json.loads((vault / "projects.json").read_text())
     print(json.dumps(registry, indent=2))
     check(registry["trace-project"]["remotes"] == ["github.com/someone/trace-project"]
-          and registry["trace-project"]["paths"] == [str(project)], "the first write registered root and remote")
+          and registry["trace-project"]["paths"] == [str(project)] and "other-notes" not in registry,
+          "the first write registered root and remote; an explicit project is not registered")
 
     print("\n--- prime ---")
     prime = subprocess.run(["java", "-jar", str(JAR), "prime"], input=json.dumps({"cwd": str(project)}),
@@ -169,11 +189,11 @@ def main():
     calls = [event for event in journal if event["mode"] == "server"]
     primes = [event for event in journal if event["mode"] == "prime"]
     print(f"{len(calls)} tool calls, {len(primes)} prime runs")
-    check(len(calls) == 16
-          and all(event["project"] == "trace-project" for event in calls if event["outcome"] == "ok")
+    check(len(calls) == 23
+          and all(event["project"] in ("trace-project", "other-notes") for event in calls if event["outcome"] == "ok")
           and any("revision mismatch" in event.get("error", "") for event in calls)
           and primes and primes[-1]["project"] == "trace-project" and primes[-1]["chars"] > 0,
-          "the journal has all 16 tool calls with their project, the rejected edit and the prime run")
+          "the journal has all 23 tool calls with their project, the rejected edit and the prime run")
 
     failed = [what for ok, what in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed; trace dir {tmp}")

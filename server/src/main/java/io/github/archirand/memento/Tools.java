@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -76,7 +77,12 @@ final class Tools
                     (project, args) -> {
                         List<Map<String, Object>> documents = new ArrayList<>();
                         List<String> missing = new ArrayList<>();
-                        for (String name : strings(args, "names"))
+                        List<String> names = strings(args, "names");
+                        if (names.isEmpty())
+                        {
+                            throw new MementoException("names must be a non-empty array of document names");
+                        }
+                        for (String name : names)
                         {
                             if (!Doc.NAME.matcher(name).matches())
                             {
@@ -153,14 +159,11 @@ final class Tools
                     List.of("name", "edits"),
                     (project, args) -> {
                         List<Edit> edits = new ArrayList<>();
-                        if (args.get("edits") instanceof List<?> list)
+                        for (Object item : list(args, "edits"))
                         {
-                            for (Object item : list)
-                            {
-                                Map<?, ?> map = item instanceof Map<?, ?> m ? m : Map.of();
-                                edits.add(new Edit(map.get("oldText") instanceof String oldText ? oldText : null,
-                                                   map.get("newText") instanceof String newText ? newText : null));
-                            }
+                            Map<?, ?> map = item instanceof Map<?, ?> m ? m : Map.of();
+                            edits.add(new Edit(map.get("oldText") instanceof String oldText ? oldText : null,
+                                               map.get("newText") instanceof String newText ? newText : null));
                         }
                         return saved(project, store.edit(project, string(args, "name"), edits, string(args, "expectedRevision")));
                     });
@@ -218,19 +221,25 @@ final class Tools
         McpSchema.CallToolResult result;
         try
         {
-            Project project = project(args, READ_ONLY.contains(tool));
+            boolean reading = READ_ONLY.contains(tool);
+            List<String> known = store.projects();
+            Project project = project(args, reading, known);
             entry.put("project", project.key());
-            Object out = handler.handle(project, args);
-            if (out instanceof Map<?, ?> map)
+            Map<String, Object> out = new LinkedHashMap<>(handler.handle(project, args));
+            if (!project.fromCwd() && !reading && !known.contains(project.key()))
             {
-                if (map.get("revision") != null)
-                {
-                    entry.put("revision", map.get("revision"));
-                }
-                if (map.get("warnings") instanceof List<?> warnings && !warnings.isEmpty())
-                {
-                    entry.put("warnings", warnings);
-                }
+                List<Object> warnings = new ArrayList<>(out.get("warnings") instanceof List<?> list ? list : List.of());
+                warnings.add("created new project '" + project.key() + "'; known projects: " + String.join(", ", known)
+                             + ". If the key is a typo, delete this document and write to the right project");
+                out.put("warnings", warnings);
+            }
+            if (out.get("revision") != null)
+            {
+                entry.put("revision", out.get("revision"));
+            }
+            if (out.get("warnings") instanceof List<?> warnings && !warnings.isEmpty())
+            {
+                entry.put("warnings", warnings);
             }
             entry.put("outcome", "ok");
             result = result(JSON.writeValueAsString(out), false);
@@ -263,7 +272,7 @@ final class Tools
     /**
      * Explicit key from args, otherwise resolved from the working directory. A read-only tool fails on an unknown explicit key.
      */
-    private Project project(Map<String, Object> args, boolean reading) throws IOException
+    private Project project(Map<String, Object> args, boolean reading, List<String> known) throws IOException
     {
         String key = string(args, "project");
         if (key == null)
@@ -271,7 +280,6 @@ final class Tools
             return ProjectResolver.resolve(cwd, Registry.load(vault.root));
         }
         Project project = ProjectResolver.explicit(key);
-        List<String> known = store.projects();
         if (reading && !known.contains(key))
         {
             throw new MementoException("unknown project '" + key + "'; known projects: " + String.join(", ", known));
@@ -327,12 +335,33 @@ final class Tools
 
     private static List<String> strings(Map<String, Object> args, String key)
     {
-        return args.get(key) instanceof List<?> list ? list.stream().map(String::valueOf).map(String::strip).toList() : List.of();
+        return list(args, key).stream().filter(Objects::nonNull).map(String::valueOf).map(String::strip).toList();
+    }
+
+    /**
+     * Array argument, empty if absent. Some clients send arrays JSON-encoded as a string: such a string is decoded,
+     * any other string counts as a one-element array.
+     */
+    private static List<?> list(Map<String, Object> args, String key)
+    {
+        Object value = args.get(key);
+        if (value instanceof String s)
+        {
+            try
+            {
+                value = s.strip().startsWith("[") ? JSON.readValue(s, List.class) : List.of(s);
+            }
+            catch (IOException e)
+            {
+                value = List.of(s);
+            }
+        }
+        return value instanceof List<?> list ? list : List.of();
     }
 
     @FunctionalInterface
     private interface Handler
     {
-        Object handle(Project project, Map<String, Object> args) throws IOException;
+        Map<String, Object> handle(Project project, Map<String, Object> args) throws IOException;
     }
 }
